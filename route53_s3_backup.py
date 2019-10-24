@@ -1,16 +1,22 @@
 import boto3
 import time
+import datetime
 
+now = datetime.datetime.now()
+today = now.strftime("%Y-%m-%d")
 s3 = boto3.resource('s3')
 route53 = boto3.client('route53')
 bucketName = ""
+route53FolderName = "route53"
 hostedZones = []
+recordSets = {}
 globalErrorList = []
 
 def main():
     getHostedZones()
-    print('hostedZones', hostedZones)
     getRecords()
+    # print('recordSets', recordSets)
+
 
 
 
@@ -22,7 +28,7 @@ def getHostedZones(nextMarker=""):
             response = route53.list_hosted_zones(Marker=nextMarker)
         else:
             response = route53.list_hosted_zones()
-        print(response)
+        print('Hosted zone count: ', len(response['HostedZones']))
     except Exception as x:
         globalErrorList.append(str(x))
         print(x)
@@ -33,22 +39,30 @@ def getHostedZones(nextMarker=""):
     if bool(response['IsTruncated']):
         getHostedZones(str(response['NextMarker']))
 
-def getRecords():
+def getRecords(startRecordName=""):
     print(hostedZones)
     for zone in hostedZones:
         try:
             print('Getting records for '+ str(zone['Name']))
-            response = route53.list_resource_record_sets(
-                HostedZoneId=zone['Id']
-                # StartRecordName='string',
-                # StartRecordType='SOA'|'A'|'TXT'|'NS'|'CNAME'|'MX'|'NAPTR'|'PTR'|'SRV'|'SPF'|'AAAA'|'CAA',
-                # StartRecordIdentifier='string',
-                # MaxItems='string'
-            )
-            print('response', response)
+            if startRecordName is not "":
+                response = route53.list_resource_record_sets(HostedZoneId=zone['Id'], StartRecordName=startRecordName)
+            else: 
+                response = route53.list_resource_record_sets(HostedZoneId=zone['Id'])
+            print('response record set count: ', len(response['ResourceRecordSets']))
+            time.sleep(2)
+
+            recordSets[zone['Name']] = []
+            for record in response['ResourceRecordSets']:
+                recordSets[zone['Name']].append(record)
+            
+            if bool(response['IsTruncated']):
+                getRecords(str(response['NextRecordName']))
         except Exception as x:   
             globalErrorList.append(str(x))
             print(x)
+
+def writeRecordsToFile():
+    print('Writing records to file ..')
 
 def uploadRoute53DataFile(data):
     # Upload a new file

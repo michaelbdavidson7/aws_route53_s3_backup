@@ -4,11 +4,11 @@ import datetime
 import json
 import os
 
-# Settings: 
-deployToS3Bucket=False
+# Settings:
+deployToS3Bucket = False
 bucketName = "mdavidson-route53-backup"
 
-# Init: 
+# Init:
 now = datetime.datetime.now()
 today = now.strftime("%Y-%m-%d")
 s3 = boto3.resource('s3')
@@ -48,7 +48,7 @@ def getHostedZones(nextMarker=""):
 
 
 def getRecords(startRecordName=""):
-    print(hostedZones)
+    print('Getting records for hosted zones .. ')
     for zone in hostedZones:
         try:
             print('Getting records for ' + str(zone['Name']))
@@ -102,7 +102,8 @@ def uploadRoute53DataFile():
         fullFileName = cwd + '/' + zone['Name'] + 'json'
         # Upload a new file
         data = open(fullFileName, 'rb')
-        s3.Bucket(bucketName).put_object(Key=route53FolderName+'/'+today+'/'+zone['Name']+'json', Body=data)
+        s3.Bucket(bucketName).put_object(Key=route53FolderName +
+                                         '/'+today+'/'+zone['Name']+'json', Body=data)
 
 
 main()

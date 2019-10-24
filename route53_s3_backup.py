@@ -6,7 +6,7 @@ import os
 
 # Settings:
 deployToS3Bucket = False
-bucketName = "mdavidson-route53-backup"
+bucketName = "x"
 
 # Init:
 now = datetime.datetime.now()
@@ -47,27 +47,38 @@ def getHostedZones(nextMarker=""):
         getHostedZones(str(response['NextMarker']))
 
 
-def getRecords(startRecordName=""):
+def getRecords(startRecordName="", passedInZoneId="", passedInZoneName=""):
     print('Getting records for hosted zones .. ')
     for zone in hostedZones:
         try:
-            print('Getting records for ' + str(zone['Name']))
             if startRecordName is not "":
+                print('Getting additional records for zoneid ', passedInZoneId)
                 response = route53.list_resource_record_sets(
-                    HostedZoneId=zone['Id'], StartRecordName=startRecordName)
+                    HostedZoneId=passedInZoneId, StartRecordName=startRecordName)
+                print(response)
+
+                for record in response['ResourceRecordSets']:
+                    recordSets[passedInZoneName].append(record)
+                print(len(recordSets[passedInZoneName]))
             else:
+                print('Getting records for ' + str(zone['Name']))
                 response = route53.list_resource_record_sets(
                     HostedZoneId=zone['Id'])
-            print('response record set count: ', len(
-                response['ResourceRecordSets']))
+                
+                if zone['Name'] not in recordSets:
+                    recordSets[zone['Name']] = []
+                for record in response['ResourceRecordSets']:
+                    recordSets[zone['Name']].append(record)
+            print('response record set count: ', len(response['ResourceRecordSets']))
             time.sleep(2)
 
-            recordSets[zone['Name']] = []
-            for record in response['ResourceRecordSets']:
-                recordSets[zone['Name']].append(record)
 
-            if bool(response['IsTruncated']):
-                getRecords(str(response['NextRecordName']))
+            if response['IsTruncated'] == True:
+                print('Truncated response.. going back for more .. ')
+                getRecords(str(response['NextRecordName']), str(zone['Id']), str(zone['Name']))
+
+            if startRecordName is not "":
+                return
         except Exception as x:
             globalErrorList.append(str(x))
             print(x)
@@ -101,9 +112,12 @@ def uploadRoute53DataFile():
     for zone in hostedZones:
         fullFileName = cwd + '/' + zone['Name'] + 'json'
         # Upload a new file
+        print('Writing ' + zone['Name'] + ' to bucket')
         data = open(fullFileName, 'rb')
         s3.Bucket(bucketName).put_object(Key=route53FolderName +
                                          '/'+today+'/'+zone['Name']+'json', Body=data)
+        
+        time.sleep(1)
 
 
 main()

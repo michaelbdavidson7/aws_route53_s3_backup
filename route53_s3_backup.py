@@ -4,11 +4,15 @@ import datetime
 import json
 import os
 
+# Settings: 
+deployToS3Bucket=False
+bucketName = "mdavidson-route53-backup"
+
+# Init: 
 now = datetime.datetime.now()
 today = now.strftime("%Y-%m-%d")
 s3 = boto3.resource('s3')
 route53 = boto3.client('route53')
-bucketName = ""
 route53FolderName = "route53"
 fullFolderPath = route53FolderName + "/" + today
 hostedZones = []
@@ -20,6 +24,7 @@ def main():
     getHostedZones()
     getRecords()
     writeRecordsToFile()
+    uploadRoute53DataFile()
 
 
 def getHostedZones(nextMarker=""):
@@ -79,7 +84,7 @@ def writeRecordsToFile():
         os.mkdir(cwd)
 
     for zone in hostedZones:
-        fileName = cwd + '/' + today + '-' + zone['Name'] + 'json'
+        fileName = cwd + '/' + zone['Name'] + 'json'
         if os.path.isfile(fileName):
             os.remove(fileName)
 
@@ -87,10 +92,17 @@ def writeRecordsToFile():
             print(json.dumps(recordSets[zone['Name']]), file=outputFile)
 
 
-def uploadRoute53DataFile(data):
-    # Upload a new file
-    data = open('test.jpg', 'rb')
-    s3.Bucket(bucketName).put_object(Key='test.jpg', Body=data)
+def uploadRoute53DataFile():
+    if deployToS3Bucket is False:
+        return
+    print('Writing files to s3 bucket ..')
+    cwd = './' + route53FolderName + '/' + today
+
+    for zone in hostedZones:
+        fullFileName = cwd + '/' + zone['Name'] + 'json'
+        # Upload a new file
+        data = open(fullFileName, 'rb')
+        s3.Bucket(bucketName).put_object(Key=route53FolderName+'/'+today+'/'+zone['Name']+'json', Body=data)
 
 
 main()
